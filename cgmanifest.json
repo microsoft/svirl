@@ -1,0 +1,13 @@
+{"Registrations":[
+    {
+        "component": {
+            "type": "git",
+            "git": {
+                "repositoryUrl": "https://github.com/NVIDIA-developer-blog/code-samples.git"
+                "commitHash": "1c96aecd493aad0a8d1b4b64ddf12bc430af63c2"
+            }
+        },
+        "developmentDependency": true
+    },
+]
+}
