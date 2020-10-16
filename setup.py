@@ -27,19 +27,7 @@ class svirl_metadata():
     license = 'MIT'
 
     # this is a required input
-    #packages    = find_packages('svirl')
-    #packages    = find_namespace_packages(include=["svirl.*"])
-    packages = ['svirl']
-    package_dir = {
-            'svirl'       : 'svirl', 
-            'mesh'        : 'svirl/mesh',
-            'parallel'    : 'svirl/parallel',
-            'solvers'     : 'svirl/solvers',
-            'storage'     : 'svirl/storage',
-            'variables'   : 'svirl/variables',
-            'observables' : 'svirl/observables',
-            }
-
+    packages    = find_namespace_packages(include=["svirl*"])
 
     # https://pypi.org/classifiers/
     classifiers = [
@@ -73,7 +61,6 @@ setup(
       description  = svirl.description,
       license      = svirl.license,
       packages     = svirl.packages,
-      package_dir  = svirl.package_dir,
       include_package_data = True,
 
       zip_safe = False,
