@@ -1,0 +1,8 @@
+include svirl/cuda/block_reduction.h
+include svirl/cuda/cg.h
+include svirl/cuda/common.h
+include svirl/cuda/observables.h
+include svirl/cuda/reduction.h
+include svirl/cuda/td.h
+include svirl/cuda/utils.h
+

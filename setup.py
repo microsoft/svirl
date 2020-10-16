@@ -71,11 +71,9 @@ setup(
       name         = svirl.name,
       version      = svirl.version,
       description  = svirl.description,
-      author       = svirl.author,
-      author_email = svirl.author_email,
       license      = svirl.license,
       packages     = svirl.packages,
-      #package_dir  = svirl.package_dir,
+      package_dir  = svirl.package_dir,
       include_package_data = True,
 
       zip_safe = False,
