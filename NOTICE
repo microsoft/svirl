@@ -3,7 +3,7 @@ NOTICES
 This repository incorporates material as listed below or described in the code. 
 
 Component: 
-  Parallel reduction on GPU (gl/cuda/block_reduction.h)
+  Parallel reduction on GPU (svirl/cuda/block_reduction.h)
 
 Open Source License/Copyright Notice:
 

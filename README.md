@@ -31,7 +31,7 @@ Requires:
 Example:
 ```python
 import numpy as np
-from gl import GinzburgLandauSolver
+from svirl import GinzburgLandauSolver
 
 gl = GinzburgLandauSolver(
     dx = 0.5, dy = 0.5,
@@ -63,14 +63,14 @@ print('Magnetic field: array of shape', gl.observables.magnetic_field.shape)
 
 # Directory structure
 
-* [`gl`](../../tree/master/gl) &mdash; main package
-  * [`gl/solvers`](../../tree/master/gl/solvers) &mdash; [conjugate gradient free energy minimizer](../../blob/master/solvers/cg.py) and [time-dependent](../../blob/solvers/td.py) solvers
- * [`gl/mesh`](../../tree/master/gl/mesh) &mdash; material tiling and grid coordinates at cells, nodes, and edges
-  * [`gl/storage`](../../tree/master/gl/storage) &mdash; storage on host and device
-  * [`gl/parallel`](../../tree/master/gl/parallel) &mdash; reductions and cuda device initialization
-  * [`gl/variables`](../../tree/master/gl/variables) &mdash; parameters and variables
-  * [`gl/observables`](../../tree/master/gl/observables) &mdash; physical observables including vortex detector
-  * [`gl/cuda`](../../tree/master/gl/cuda) &mdash; CUDA kernels
+* [`svirl`](../../tree/master/svirl) &mdash; main package
+  * [`svirl/solvers`](../../tree/master/svirl/solvers) &mdash; [conjugate gradient free energy minimizer](../../blob/master/solvers/cg.py) and [time-dependent](../../blob/solvers/td.py) solvers
+  * [`svirl/mesh`](../../tree/master/svirl/mesh) &mdash; material tiling and grid coordinates at cells, nodes, and edges
+  * [`svirl/storage`](../../tree/master/svirl/storage) &mdash; storage on host and device
+  * [`svirl/parallel`](../../tree/master/svirl/parallel) &mdash; reductions and cuda device initialization
+  * [`svirl/variables`](../../tree/master/svirl/variables) &mdash; parameters and variables
+  * [`svirl/observables`](../../tree/master/svirl/observables) &mdash; physical observables including vortex detector
+  * [`svirl/cuda`](../../tree/master/svirl/cuda) &mdash; CUDA kernels
 * [`docs`](../../tree/master/docs) &mdash; documentation
   * [Style guide](../../blob/master/docs/style_guide.md)
 * [`examples`](../../tree/master/examples) &mdash; examples and use cases
