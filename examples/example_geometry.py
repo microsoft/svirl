@@ -1,5 +1,5 @@
 import sys, os
-sys.path.append(os.path.abspath("../"))
+sys.path.append(os.path.abspath('../'))
 
 import numpy as np
 
@@ -22,39 +22,24 @@ gl = GinzburgLandauSolver(
     dx = 0.5,  dy = 0.5,
     order_parameter = 'random',
     random_level = 0.5,
-    material_tiling = material,  # can be array, vectorized function, or None
+    material_tiling = material,
     linear_coefficient = 1.0,
     gl_parameter = 5.0,
-    normal_conductivity = 200.0,
+    normal_conductivity = 50,
     homogeneous_external_field = 0.1,
     dtype = np.float64,
 )
 
-dt = 0.1;  Nt = 1000
-print('Iterate GL: %d timesteps with dt = %g' % (Nt, dt))
-for i in range(Nt):
-    gl.solve.td(dt = dt, Nt = 1, eqn = 'order_parameter')
-    gl.solve.td(dt = dt, Nt = 3, eqn = 'vector_potential')
+images_dir = 'images'
+if not os.path.exists(images_dir): os.mkdir(images_dir)
 
-dir = 'OUT'
-if not os.path.exists(dir): os.mkdir(dir)
-
-print('Save snapshot to %s/geometry.png' % (dir))
-# plotter.savesimple(gl, '%s/geometry.png' % (dir), ('material_tiling', 'superfluid_density'))
-plotter.savesimple(gl, '%s/geometry.png' % (dir), ('material_tiling', 'superfluid_density', 'op_fv_phase', 'magnetic_field', 'current_density', 'normalcurrent_density'), )
-plotter.save(gl, '%s/geometry_full.png' % (dir), ('material_tiling', 'superfluid_density', 'op_fv_phase', 'magnetic_field', 'current_density', 'normalcurrent_density'), )
-
-
-
-
-print('Invert geometry')
-gl.mesh.material_tiling = ~gl.mesh.material_tiling
-gl.vars.set_order_parameter_to_zero_outside_material()
-gl.vars.order_parameter = 1.0
-gl.vars.randomize_order_parameter(level = 0.1)
-
-print('Iterate GL: %d timesteps with dt = %g' % (Nt, dt))
+dt = 0.1;  Nt = 2000
+print('Iterate TDGL: %d timesteps with dt = %g' % (Nt, dt))
 gl.solve.td(dt = dt, Nt = Nt)
 
-print('Save snapshot to %s/geometry_inverted.png' % (dir))
-plotter.savesimple(gl, '%s/geometry_inverted.png' % (dir), ('material_tiling', 'superfluid_density'))
+print('Minimize GL free energy')
+gl.solve.cg()
+
+print('Save snapshot to %s/geometry.png' % (images_dir))
+plotter.savesimple(gl, '%s/geometry.png' % (images_dir), ('material_tiling', 'superfluid_density'))
+# plotter.save(gl, '%s/geometry.png' % (images_dir), ('material_tiling', 'superfluid_density', 'op_fv_phase', 'magnetic_field', 'current_density', 'normalcurrent_density'), )
