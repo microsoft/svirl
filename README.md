@@ -1,32 +1,24 @@
-# Svirl:  A Ginzburg-Landau (GL) solver
+# Svirl: GPU-accelerated Ginzburg-Landau equations solver
 
-Svirl is an open source GPU accelerated solver that solves the two-dimensional
-time-dependent Ginzburg-Landau (TDGL) equations at both finite and infinite
-kappa limits for an arbitrary user-defined material tiling. The solver is also
-capable of minimizing the GL free energy using a modified non-linear
-conjugate-gradient method (CG). The two solvers, TDGL and CG, can be used
-interchangeably during the simulation.
+Svirl is an open source solver of complex Ginzburg-Landau (GL) equations 
+mainly used to describe magnetic vortices in superconductors. It consists of two 
+parts: (i) time-dependent Ginzburg-Landau (TDGL) solver and (ii) GL free energy 
+minimizer with uses modified non-linear conjugate gradient method.
 
-The solver can compute the following observables: magnetic field, current and
-supercurrent densities, and free energy density, and can detect the presence of
-vortices using algorithms from the literature.
+The current version of Svirl can be used for two-dimensional (2D) systems only, 
+the work on three-dimensional (3D) solver is in progress.
 
-The TDGL solver supports fixing vortices at a particular position.
+Svirl has intuitive Python3 API and requires nVidia GPU to run. 
 
 Main features:
-* 2D time-dependent TDGL solver at finite and infinite GL parameter limits
-* single and double precision floating point arithmetic
-* Modified non-linear conjugate gradient solver to 
+* 2D time-dependent GL solver 
+* 2D GL free energy minimizer
+* finite and infinite GL parameters
 * user-defined material domain for order parameter
-* fixed vortices can be added by using irregular vector potential
-* vortex detector (CPU version)
-* observables such as GL free energy, current and supercurrent densities, and induced magnetic field
-
-Requires: 
-* python3
-* [numpy / scipy](https://www.scipy.org/)
-* [pycuda](https://documen.tician.de/pycuda/) ([installation](https://wiki.tiker.net/PyCuda/Installation))
-* Pillow / matplotlib / cmocean (optional)
+* calculates observables such as GL free energy, current density, and magnetic field
+* detector of vortex positions
+* uses nVidia CUDA by means of [pyCUDA](https://documen.tician.de/pycuda/)
+<!-- * single and double precision floating point arithmetic -->
 
 Example:
 ```python
@@ -76,12 +68,12 @@ print('Magnetic field: array of shape', gl.observables.magnetic_field.shape)
 * [`examples`](../../tree/master/examples) &mdash; examples and use cases
 * [`tests`](../../tree/master/tests) &mdash; automatic and manual tests
 
-# Further reading
+# References
 
-For details, refer to this [paper] (https://arxiv.org/pdf/1409.8340.pdf).
+* I.A. Sadovskyy et al, Stable large-scale solver for Ginzburg-Landau equations for superconductors, [J. Comp. Phys. 294, 639 (2015)](https://doi.org/10.1016/j.jcp.2015.04.002); [arXiv:1409.8340](https://arxiv.org/abs/1409.8340).
 
 
-# Code of Conduct
+# Code of conduct
 
-We follow the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct)
+We follow the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct).
 
