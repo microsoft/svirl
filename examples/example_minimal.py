@@ -1,5 +1,5 @@
 import sys, os
-sys.path.append(os.path.abspath("../"))
+sys.path.append(os.path.abspath('../'))
 
 import numpy as np
 from svirl import GinzburgLandauSolver
@@ -12,7 +12,6 @@ gl = GinzburgLandauSolver(
     gl_parameter = 5.0,  # np.inf
     normal_conductivity = 200.0,
     homogeneous_external_field = 0.1,
-    dtype = np.float64,
 )
 
 gl.vars.randomize_order_parameter(level=0.1)
