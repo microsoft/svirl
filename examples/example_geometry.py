@@ -6,7 +6,7 @@ import numpy as np
 from svirl import GinzburgLandauSolver
 from svirl import plotter
 
-print('Define geometry')
+print('Define supercondutor geometry')
 def material(x, y):
     return np.logical_or.reduce((
         np.logical_and(np.abs(x - y) < 43, np.abs(x + y - 100) < 43),
@@ -27,13 +27,13 @@ gl = GinzburgLandauSolver(
     gl_parameter = 5.0,
     normal_conductivity = 50,
     homogeneous_external_field = 0.1,
-    dtype = np.float64,
 )
 
 images_dir = 'images'
 if not os.path.exists(images_dir): os.mkdir(images_dir)
 
-dt = 0.1;  Nt = 2000
+dt = 0.1
+Nt = 2000
 print('Iterate TDGL: %d timesteps with dt = %g' % (Nt, dt))
 gl.solve.td(dt = dt, Nt = Nt)
 
@@ -41,5 +41,8 @@ print('Minimize GL free energy')
 gl.solve.cg()
 
 print('Save snapshot to %s/geometry.png' % (images_dir))
-plotter.savesimple(gl, '%s/geometry.png' % (images_dir), ('material_tiling', 'superfluid_density'))
-# plotter.save(gl, '%s/geometry.png' % (images_dir), ('material_tiling', 'superfluid_density', 'op_fv_phase', 'magnetic_field', 'current_density', 'normalcurrent_density'), )
+plotter.savesimple(gl, '%s/geometry.png' % (images_dir), 
+    ('material_tiling', 'superfluid_density'))
+# plotter.save(gl, '%s/geometry.png' % (images_dir), 
+#     ('material_tiling', 'superfluid_density', 'op_fv_phase', 
+#      'magnetic_field', 'current_density', 'normalcurrent_density'))

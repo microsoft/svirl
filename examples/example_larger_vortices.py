@@ -1,5 +1,5 @@
 import sys, os
-sys.path.append(os.path.abspath("../"))
+sys.path.append(os.path.abspath('../'))
 
 import numpy as np
 
@@ -21,17 +21,18 @@ gl = GinzburgLandauSolver(
     dtype = np.float64,
 )
 
-print('Iterate GL')
-dt = 0.1;  Nt = 10000
+print('Iterate TDGL')
+dt = 0.1
+Nt = 10000
 gl.solve.td(dt = dt, Nt = Nt)
 print('%d timesteps with dt = %g' % (Nt, dt))
 
-dir = 'OUT'
-if not os.path.exists(dir): os.mkdir(dir)
+images_dir = 'images'
+if not os.path.exists(images_dir): os.mkdir(images_dir)
 
-print('Save set of figures to %s/larger_vortices.png' % (dir))
+print('Save set of figures to %s/larger_vortices.png' % (images_dir))
 plotter.save(gl, 
-    '%s/larger_vortices.png' % (dir),
+    '%s/larger_vortices.png' % (images_dir),
     ('superfluid_density'),
     interpolation = None,
     magnification = 3.0,
