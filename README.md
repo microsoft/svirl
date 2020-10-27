@@ -2,15 +2,17 @@
 
 Svirl is an open source solver of complex Ginzburg-Landau (GL) equations 
 mainly used to describe magnetic vortices in superconductors. It consists of two 
-parts: (i) time-dependent Ginzburg-Landau (TDGL) solver and (ii) GL free energy 
-minimizer with uses modified non-linear conjugate gradient method.
+parts: (i) time-dependent Ginzburg-Landau (TDGL) solver [1] and (ii) GL free 
+energy minimizer with uses modified non-linear conjugate gradient method.
 
 The current version of Svirl can be used for two-dimensional (2D) systems only, 
 the work on three-dimensional (3D) solver is in progress.
 
-Svirl has intuitive Python3 API and requires nVidia GPU to run. 
+Svirl has intuitive Python3 API and requires nVidia GPU to run. The idea of 
+GPU-acceletrated TDGL solver was initially developed in the framework of [OSCon 
+project](http://oscon-scidac.org/) for infinite GL parameter limit.
 
-Main features:
+## Main features
 * 2D time-dependent GL solver 
 * 2D GL free energy minimizer
 * finite and infinite GL parameters
@@ -20,7 +22,7 @@ Main features:
 * uses nVidia CUDA by means of [pyCUDA](https://documen.tician.de/pycuda/)
 <!-- * single and double precision floating point arithmetic -->
 
-Example:
+## Example
 ```python
 import numpy as np
 from svirl import GinzburgLandauSolver
@@ -53,7 +55,13 @@ print('Supercurrent density: two arrays of shape', ch.shape, '[horizontal links]
 print('Magnetic field: array of shape', gl.observables.magnetic_field.shape)
 ```
 
-# Directory structure
+
+# References
+
+1. I.A. Sadovskyy et al, Stable large-scale solver for Ginzburg-Landau equations for superconductors, [J. Comp. Phys. 294, 639 (2015)](https://doi.org/10.1016/j.jcp.2015.04.002); [arXiv:1409.8340](https://arxiv.org/abs/1409.8340).
+
+
+<!-- Directory structure
 
 * [`svirl`](../../tree/master/svirl) &mdash; main package
   * [`svirl/solvers`](../../tree/master/svirl/solvers) &mdash; [conjugate gradient free energy minimizer](../../blob/master/solvers/cg.py) and [time-dependent](../../blob/solvers/td.py) solvers
@@ -66,12 +74,7 @@ print('Magnetic field: array of shape', gl.observables.magnetic_field.shape)
 * [`docs`](../../tree/master/docs) &mdash; documentation
   * [Style guide](../../blob/master/docs/style_guide.md)
 * [`examples`](../../tree/master/examples) &mdash; examples and use cases
-* [`tests`](../../tree/master/tests) &mdash; automatic and manual tests
-
-# References
-
-* I.A. Sadovskyy et al, Stable large-scale solver for Ginzburg-Landau equations for superconductors, [J. Comp. Phys. 294, 639 (2015)](https://doi.org/10.1016/j.jcp.2015.04.002); [arXiv:1409.8340](https://arxiv.org/abs/1409.8340).
-
+* [`tests`](../../tree/master/tests) &mdash; automatic and manual tests -->
 
 # Code of conduct
 
