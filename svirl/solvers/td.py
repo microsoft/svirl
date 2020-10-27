@@ -360,10 +360,10 @@ class TD(object):
             if self.solveA:
                 self.__iterate_vector_potential_gpu()
 
-            if tau%1000 == 0:
-                E0 = self.observables.free_energy # TMP
-                self.td_energies.append(E0)
-                print('%3.d: E = %10.10f' % (tau, E0)) # TMP
+            # if tau%1000 == 0:
+            #     E0 = self.observables.free_energy # TMP
+            #     self.td_energies.append(E0)
+            #     print('%3.d: E = %10.10f' % (tau, E0)) # TMP
 
 
     # solve acts as a wrapper over the iterate methods
