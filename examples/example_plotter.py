@@ -1,5 +1,5 @@
 import sys, os
-sys.path.append(os.path.abspath("../"))
+sys.path.append(os.path.abspath('../'))
 
 import numpy as np
 
@@ -18,12 +18,15 @@ gl = GLSolver(
     gl_parameter = kappa,
     normal_conductivity = 200.0,
     homogeneous_external_field = H,
-    dtype = np.float64,
 )
 
-dt = 0.1;  Nt = 1000
-print('Iterate GL: %d timesteps with dt = %g' % (Nt, dt))
+dt = 0.1
+Nt = 1000
+print('Iterate TDGL: %d timesteps with dt = %g' % (Nt, dt))
 gl.solve.td(dt = dt, Nt = Nt)
+
+print('Minimize GL free energy')
+gl.solve.cg()
 
 types = (
     'material_tiling',
@@ -39,16 +42,16 @@ types = (
     'normalcurrent_density_xy',
 )
 
-dir = 'OUT'
-if not os.path.exists(dir): os.mkdir(dir)
+images_dir = 'images'
+if not os.path.exists(images_dir): os.mkdir(images_dir)
 
-print('Save set of figures to %s/plotter_simple.png (no frame)' % (dir))
-plotter.savesimple(gl, '%s/plotter_simple.png' % (dir), types)
+print('Save set of figures to %s/plotter_simple.png (no frame)' % (images_dir))
+plotter.savesimple(gl, '%s/plotter_simple.png' % (images_dir), types)
 
 for fmt in ['png', 'pdf']:
-    print('Save set of figures to %s/plotter.%s' % (dir, fmt))
+    print('Save set of figures to %s/plotter.%s' % (images_dir, fmt))
     plotter.save(gl, 
-        '%s/plotter.%s' % (dir, fmt), 
+        '%s/plotter.%s' % (images_dir, fmt), 
         types, 
         suptitle = '2D superconductor with $\\kappa=%g$ in external field $H = %g H_\\mathrm{c2}$' % (kappa, H),
         show_vortices = tuple([True] + [None]*(len(types)-1)),

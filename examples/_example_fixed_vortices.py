@@ -1,5 +1,5 @@
 import sys, os
-sys.path.append(os.path.abspath("../"))
+sys.path.append(os.path.abspath('../'))
 
 import numpy as np
 
@@ -21,8 +21,7 @@ gl = GLSolver(
         20+20*np.array([0, 1, 0, 1]),
         [1, -1, -1, 1]
     ),
-    phase_lock_radius = 0.8,                                                              # lock phase in four grid points around each fixed vortex
-    dtype = np.float64,
+    phase_lock_radius = 0.8, # lock phase in four grid points around each fixed vortex
 )
 
 print('Iterate GL')
@@ -33,13 +32,13 @@ print('2000 timesteps with dt=0.01')
 gl.solve.td(dt=0.001, Nt=2000)
 print('2000 timesteps with dt=0.001')
 
-dir = 'OUT'
-if not os.path.exists(dir): os.mkdir(dir)
+images_dir = 'images'
+if not os.path.exists(images_dir): os.mkdir(images_dir)
 
-print('Save snapshot to %s/fixed_vortices.png' % (dir))
+print('Save snapshot to %s/fixed_vortices.png' % (images_dir))
 plotter.save(
     gl, 
-    '%s/fixed_vortices.png' % (dir), 
+    '%s/fixed_vortices.png' % (images_dir), 
     ('superfluid_density', 'op_fv_phase', 'magnetic_field', 'current_density'), 
     clim = ([0,1], [-0.5,0.5], None, None),
     magnification = 3.0,
