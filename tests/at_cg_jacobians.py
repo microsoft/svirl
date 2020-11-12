@@ -2,7 +2,7 @@ import time
 import numpy as np
 import sys, os
 sys.path.append(os.path.abspath("../"))
-from svirl import GinzburgLandauSolver
+from svirl import GLSolver
 from common import *
 
 
@@ -116,7 +116,7 @@ passed_psi, passed_A = 0, 0
 
 for o in range(Nobjects):
     # generate random system size
-    gl = GinzburgLandauSolver(
+    gl = GLSolver(
         Nx = 8 + np.random.randint(4),  
         Ny = 8 + np.random.randint(4),
         dx = 0.5 - 0.1*np.random.rand(),

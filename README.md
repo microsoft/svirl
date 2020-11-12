@@ -31,9 +31,9 @@ Requires:
 Example:
 ```python
 import numpy as np
-from svirl import GinzburgLandauSolver
+from svirl import GLSolver
 
-gl = GinzburgLandauSolver(
+gl = GLSolver(
     dx = 0.5, dy = 0.5,
     Lx = 64, Ly = 64,
     order_parameter = 'random',

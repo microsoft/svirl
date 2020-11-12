@@ -13,7 +13,7 @@ from svirl import observables as GLObs
 from svirl import solvers as GLSolvers
 
 
-class GinzburgLandauSolver(object):
+class GLSolver(object):
     """2D Ginzburg-Landau BDF solver
     
     Main features:

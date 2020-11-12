@@ -3,11 +3,11 @@ sys.path.append(os.path.abspath("../"))
 
 import numpy as np
 
-from svirl import GinzburgLandauSolver
+from svirl import GLSolver
 from svirl import plotter
 
 print('Create GL solver')
-gl = GinzburgLandauSolver(
+gl = GLSolver(
     Lx = 60,  Ly = 60,
     dx = 0.5,  dy = 0.5,
     order_parameter = 'random',

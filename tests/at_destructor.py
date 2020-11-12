@@ -1,13 +1,13 @@
 import numpy as np
 import sys, os
 sys.path.append(os.path.abspath("../"))
-from svirl import GinzburgLandauSolver
+from svirl import GLSolver
 from common import *
 
 cd_test_number, cd_test_passed = 0, 0
 for i in range(10):
     try:
-        gl = GinzburgLandauSolver(
+        gl = GLSolver(
             Nx = np.random.randint(4, 1024),
             Ny = np.random.randint(4, 1024),
             dx = 0.2 + 0.2*np.random.rand(),

@@ -3,7 +3,7 @@ sys.path.append(os.path.abspath("../"))
 
 import numpy as np
 
-from svirl import GinzburgLandauSolver
+from svirl import GLSolver
 from svirl import plotter
 
 print('Define geometry')
@@ -17,7 +17,7 @@ def material(x, y):
     ))
 
 print('Create GL solver')
-gl = GinzburgLandauSolver(
+gl = GLSolver(
     Lx = 250,  Ly = 250,
     dx = 0.5,  dy = 0.5,
     order_parameter = 'random',

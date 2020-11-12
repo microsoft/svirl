@@ -2,9 +2,9 @@ import sys, os
 sys.path.append(os.path.abspath("../"))
 
 import numpy as np
-from svirl import GinzburgLandauSolver
+from svirl import GLSolver
 
-gl = GinzburgLandauSolver(
+gl = GLSolver(
     dx = 0.5, dy = 0.5,
     Lx = 64, Ly = 64,
     order_parameter = 1.0,

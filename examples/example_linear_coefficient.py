@@ -3,7 +3,7 @@ sys.path.append(os.path.abspath("../"))
 
 import numpy as np
 
-from svirl import GinzburgLandauSolver
+from svirl import GLSolver
 from svirl import plotter
 
 Nx, Ny = 201, 201
@@ -19,7 +19,7 @@ for i in range(Nx):
 print('Create GL solver')
 kappa = 10.0
 H = 0.1
-gl = GinzburgLandauSolver(
+gl = GLSolver(
     Nx = Nx,  Ny = Ny,
     dx = 0.5,  dy = 0.5,
     order_parameter = 'random',

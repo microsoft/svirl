@@ -1,12 +1,12 @@
 import numpy as np
 import sys, os
 sys.path.append(os.path.abspath("../"))
-from svirl import GinzburgLandauSolver
+from svirl import GLSolver
 from svirl.storage import GArray
 from common import *
 
 
-gl = GinzburgLandauSolver(
+gl = GLSolver(
     Nx = 8 + np.random.randint(4),  
     Ny = 8 + np.random.randint(4),
     dx = 0.5 - 0.1*np.random.rand(),

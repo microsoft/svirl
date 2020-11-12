@@ -4,7 +4,7 @@ sys.path.append(os.path.abspath("../"))
 import numpy as np
 import matplotlib.pyplot as plt
 
-from svirl import GinzburgLandauSolver
+from svirl import GLSolver
 from svirl import plotter
 
 from common import *
@@ -24,7 +24,7 @@ def material(x, y):
               np.logical_and(y > gl.cfg.Ly/2 - 10.0*dy/2, y < gl.cfg.Ly/2 + 10.0*dy/2))
             )
 
-gl = GinzburgLandauSolver(
+gl = GLSolver(
         Lx = 100,  Ly = 100,
         dx = dx,  dy = dy,
         order_parameter = 1.0,
@@ -47,7 +47,7 @@ free_energy_sp = gl.observables.free_energy
 
 del gl
 
-gl = GinzburgLandauSolver(
+gl = GLSolver(
         Lx = 100,  Ly = 100,
         dx = dx,  dy = dy,
         order_parameter = 1.0,
