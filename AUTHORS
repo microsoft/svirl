@@ -1,0 +1,10 @@
+Svirl is maintained by
+
+* Shriram Jagannathan [https://github.com/shriramjagan] - architecture, discretization, performance optimization
+* Ivan Sadovskyy [https://github.com/ivan-sadovsky] - physics, numerical methods
+
+Consulting researchers
+
+* Andreas Glatz - time-dependent solver, code validation
+* Filipp Rybakov - modified conjugate gradient method
+* Egor Babaev - modified conjugate gradient method
