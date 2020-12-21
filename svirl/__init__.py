@@ -8,7 +8,7 @@ from svirl import config as cfg
 
 from svirl import parallel  as GLPar 
 from svirl import mesh      as GLMesh
-from svirl import variables as GLVars
+from svirl import vars      as GLVars
 from svirl import observables as GLObs
 from svirl import solvers as GLSolvers
 
