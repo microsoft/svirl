@@ -9,21 +9,27 @@ def readme():
 # https://docs.python.org/3/distutils/setupscript.html#meta-data
 class svirl_metadata():
 
+    from svirl import version 
+
     name = 'svirl'
-    version = '1.0' # Format: major.minor.build.revision
-    description = 'GPU accelerated Ginzburg-Landau equations solver'
+
+    # Format: major.minor.revision
+    version = version.version 
+
+    description = "GPU accelerated Ginzburg-Landau equations solver"
     long_description = readme() 
+    long_description_content_type = 'text/markdown'
 
     provides = []
-    requires = [
-        'python>=3.0',
+    install_requires = [
         'pycuda>=2018.1',
         'numpy>=1.15',
         'scipy>=1.1',
         'matplotlib>=3.0',
-        'PIL>=1.1.6',
         'cmocean>=1.2',
     ]
+
+    python_requires='>=3.0'
 
     maintainer = 'Shriram Jagannathan, Ivan Sadovskyy'
     maintainer_email = 'svirl@outlook.com'
@@ -69,8 +75,12 @@ setup(
     name                 = svirl.name,
     version              = svirl.version,
     description          = svirl.description,
+    long_description     = svirl.long_description,
+    long_description_content_type = svirl.long_description_content_type,
     license              = svirl.license,
     packages             = svirl.packages,
+    install_requires     = svirl.install_requires,
+    python_requires      = svirl.python_requires,
     maintainer           = svirl.maintainer,
     maintainer_email     = svirl.maintainer_email,
     include_package_data = True,

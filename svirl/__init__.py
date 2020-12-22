@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+
 import numpy as np
 from pycuda import gpuarray
 
@@ -11,6 +12,8 @@ from svirl import mesh      as GLMesh
 from svirl import vars      as GLVars
 from svirl import observables as GLObs
 from svirl import solvers as GLSolvers
+
+from .version import version as __version__
 
 
 class GLSolver(object):
