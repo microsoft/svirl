@@ -38,23 +38,34 @@ class Solvers(object):
 
     # Exposed properties and methods
 
-    def td(self, dt = 0.1, Nt = 1000, T = None, eqn = None):
+    def td(self, dt = 0.1, Nt = 1000, T = None, 
+                 dtA = None, NtA = None, TA = None,
+                 eqn = None):
         """ Driver function to solve the time-Depenedent 
         Ginzburg-Landau PDE for the specified number of time steps 
         or until the specified time
 
         Parameters
         ----------
-        dt: Time step size
+        dt, dtA: Time step sizes (order parameter and vector potential)
 
-        Nt: Number of time steps
+        Nt, NtA: Number of time steps (order parameter and vector potential)
 
-        T : End time
+        T, TA: End time (order parameter and vector potential)
 
-        eqn: Accepts 'order_parameter' or 'vector_potential'
-             and solves that equation
+        dtA, NtA, and TA are optional arguments if equation is not specified. 
+        The corresponding values from dt, Nt, and T will be used. They are 
+        needed if eqn is set to 'vector_potential'.
+ 
+        eqn (optional): Accepts 'order_parameter' or 'vector_potential' and
+             solves that equation. By default, both equations are solved
         """
-        self.__solve_td(dt = dt, Nt = Nt, T = T, eqn = eqn)
+        if dtA is None:
+            dtA = dt
+        if NtA is None:
+            NtA = Nt
+
+        self.__solve_td(dt, Nt, T, dtA, NtA, TA, eqn = eqn)
         self.vortices_detected = False
 
 
@@ -96,9 +107,12 @@ class Solvers(object):
                     self.params, self.observables)
 
 
-    def __solve_td(self, dt = None, Nt = None, T = None, eqn = None):
+    def __solve_td(self, dt, Nt, T, dtA, NtA, TA, eqn = None):
         assert isinstance(Nt, (np.integer, int))
         assert isinstance(dt, (np.floating, float, np.integer, int))
+
+        assert isinstance(NtA, (np.integer, int))
+        assert isinstance(dtA, (np.floating, float, np.integer, int))
 
         if eqn is not None:
             assert eqn in ['order_parameter', 'vector_potential']
@@ -106,8 +120,11 @@ class Solvers(object):
         if T is not None:
             assert isinstance(T, (np.floating, float, np.integer, int))
 
+        if TA is not None:
+            assert isinstance(TA, (np.floating, float, np.integer, int))
+
         self._init_td()
-        self._td._solve(dt = dt, Nt = Nt, T = T, eqn = eqn)
+        self._td._solve(dt, Nt, T, dtA, NtA, TA, eqn = eqn)
 
 
     def __solve_cg(self, n_iter):

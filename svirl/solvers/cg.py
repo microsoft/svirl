@@ -133,7 +133,7 @@ class CG(object):
             self.params.linear_coefficient_h(),
             self.params.homogeneous_external_field,
 
-            self.mesh.material_tiling_h(),
+            self.mesh._flags_h(),
             self.vars.order_parameter_h(),
             self.params.external_irregular_vector_potential_h(),
             self.vars.vector_potential_h(),
@@ -168,7 +168,7 @@ class CG(object):
             self.params.gl_parameter_squared_h(),
             self.params.homogeneous_external_field,
 
-            self.mesh.material_tiling_h(),
+            self.mesh._flags_h(),
             self.vars.order_parameter_h(),
             self.params.external_irregular_vector_potential_h(),
             self.vars.vector_potential_h(),
@@ -201,7 +201,7 @@ class CG(object):
             self.params.linear_coefficient_h(),
             self.params.homogeneous_external_field,
 
-            self.mesh.material_tiling_h(),
+            self.mesh._flags_h(),
             self.vars.order_parameter_h(),
 
             __gdir_psi,
@@ -347,7 +347,7 @@ class CG(object):
             self.params.linear_coefficient_h(),
             self.params.homogeneous_external_field,
 
-            self.mesh.material_tiling_h(),
+            self.mesh._flags_h(),
             self.vars.order_parameter_h(),
             __gdir_psi,
 
@@ -535,8 +535,8 @@ class CG(object):
             
             E0 = self.observables.free_energy # TMP
             self.cg_energies.append(E0) # TMP
-            # if i%10 == 0:
-            #     print('%3.d: E = %10.10f' % (i, E0)) # TMP
+            if i%10 == 0:
+                print('%3.d: E = %10.10f' % (i, E0)) # TMP
 
             if (i > 0  and np.abs(self.cg_energies[i]/self.cg_energies[i-1] -
                 1.0) < self.__convergence_rtol):

@@ -18,7 +18,7 @@ void free_energy_jacobian_psi(
     real_t epsilon,
     real_t *epsilon_spatial,
     real_t H,
-    bool *mt, 
+    const int32_t *flags, 
     complex_t *psi,
     real_t *abei,
     real_t *ab,
@@ -26,8 +26,7 @@ void free_energy_jacobian_psi(
 ) {
     const int32_t Nx = %(Nx)s, Ny = %(Ny)s,
                   Nxa = %(Nx)s-1, Na = (%(Nx)s-1)*%(Ny)s,
-                  Nxb = %(Nx)s,
-                  Nxc = %(Nx)s-1; // Nyc = %(Ny)s-1;
+                  Nxb = %(Nx)s;
     
     const real_t dx = %(dx)s, dy = %(dy)s,
                  //idx = 1.0/%(dx)s, idy = 1.0/%(dy)s, 
@@ -44,31 +43,12 @@ void free_energy_jacobian_psi(
     
     complex_t g_jac = 0.0;
     
-    bool mt_mm = (i  > 0 ) && (j  > 0 ),                                                  // left-bottom cell in Nx-by-Ny grid
-         mt_mp = (i  > 0 ) && (jp < Ny),                                                  // left-upper cell in Nx-by-Ny grid
-         mt_pm = (ip < Nx) && (j  > 0 ),                                                  // right-bottom cell in Nx-by-Ny grid
-         mt_pp = (ip < Nx) && (jp < Ny);                                                  // right-upper cell in Nx-by-Ny grid
-    if (mt != NULL) {
-        if (mt_mm) {mt_mm = mt[im + Nxc*jm];}                                             // left-bottom cell in material; flatten_c(i, j) = i + Nxc*j
-        if (mt_mp) {mt_mp = mt[im + Nxc*j ];}                                             // left-upper cell in material
-        if (mt_pm) {mt_pm = mt[i  + Nxc*jm];}                                             // right-bottom cell in material
-        if (mt_pp) {mt_pp = mt[i  + Nxc*j ];}                                             // right-upper cell in material
-    }
-    
-    if (mt_mm || mt_mp || mt_pm || mt_pp) {
-#if EDGES == EDGES_DU
-        real_t r_m0 = 0.5*((mt_mm?1.0:0.0) + (mt_mp?1.0:0.0));
-        real_t r_p0 = 0.5*((mt_pm?1.0:0.0) + (mt_pp?1.0:0.0));
-        real_t r_0m = 0.5*((mt_mm?1.0:0.0) + (mt_pm?1.0:0.0));
-        real_t r_0p = 0.5*((mt_mp?1.0:0.0) + (mt_pp?1.0:0.0));
-        real_t g = 0.25 * (r_m0 + r_p0 + r_0m + r_0p);
-#elif EDGES == EDGES_WA
-        real_t r_m0 = (mt_mm || mt_mp)?1.0:0.0;
-        real_t r_p0 = (mt_pm || mt_pp)?1.0:0.0;
-        real_t r_0m = (mt_mm || mt_pm)?1.0:0.0;
-        real_t r_0p = (mt_mp || mt_pp)?1.0:0.0;
+    if (IS_FLAG_COMPUTE_PSI(flags[n])) {
+        real_t r_m0 = IS_FLAG_LEFT_LINK(flags[n]); 
+        real_t r_p0 = IS_FLAG_RIGHT_LINK(flags[n]); 
+        real_t r_0m = IS_FLAG_BOTTOM_LINK(flags[n]); 
+        real_t r_0p = IS_FLAG_TOP_LINK(flags[n]);
         real_t g = 1.0;
-#endif
         
         complex_t psi0 = psi[n], 
                   psi1;
@@ -88,13 +68,14 @@ void free_energy_jacobian_psi(
         // Note, we have all four terms here; the reason mainly 
         // is that we have two psi's in |psi1*U-psi0|^2, which 
         // effectively doubles the number of terms
-        if (mt_mm || mt_mp) {
+        if (r_m0){ 
             p = 0.0;
             if (abei != NULL) p += abei[im + Nxa*j];
             if (ab != NULL) p += ab[im + Nxa*j];
             g_jac += r_m0 * idx2 * g_grad_jac_psi(psi0, - dx*p, psi[im + Nx*j]);
         }
-        if (mt_pm || mt_pp) {
+
+        if (r_p0){ 
             p = 0.0;
             if (abei != NULL) p += abei[i + Nxa*j];
             if (ab != NULL) p += ab[i + Nxa*j];
@@ -102,13 +83,14 @@ void free_energy_jacobian_psi(
         }
 #endif
 #if CALC_GRAD_Y_TERM
-        if (mt_mm || mt_pm) {
+        if (r_0m) {
             p = 0.0;
             if (abei != NULL) p += abei[Na + i + Nxb*jm];
             if (ab != NULL) p += ab[Na + i + Nxb*jm];
             g_jac += r_0m * idy2 * g_grad_jac_psi(psi0, - dy*p, psi[i + Nx*jm]);
         }
-        if (mt_mp || mt_pp) {
+
+        if (r_0p){
             p = 0.0;
             if (abei != NULL) p += abei[Na + i + Nxb*j];
             if (ab != NULL) p += ab[Na + i + Nxb*j];
@@ -127,7 +109,7 @@ void free_energy_jacobian_A(
     // real_t epsilon,
     // real_t *epsilon_spatial,
     real_t H,
-    bool *mt, 
+    const int32_t *flags, 
     complex_t *psi,
     real_t *abei,
     real_t *ab,
@@ -138,8 +120,7 @@ void free_energy_jacobian_A(
     
     const int32_t Nx = %(Nx)s, Ny = %(Ny)s,
                   Nxa = %(Nx)s-1, Nya = %(Ny)s, Na = (%(Nx)s-1)*%(Ny)s,
-                  Nxb = %(Nx)s,   Nyb = %(Ny)s - 1,
-                  Nxc = %(Nx)s-1; //, Nyc = %(Ny)s-1;
+                  Nxb = %(Nx)s,   Nyb = %(Ny)s - 1;
     
     const real_t dx = %(dx)s, dy = %(dy)s,
                  idx = 1.0/%(dx)s, idy = 1.0/%(dy)s, 
@@ -159,17 +140,9 @@ void free_energy_jacobian_A(
     
     real_t g_jac;
     real_t p, dd;
-    
-    bool //mt_mm = (i  > 0 ) && (j  > 0 ),                                                  // left-bottom cell in Nx-by-Ny grid
-         mt_mp = (i  > 0 ) && (jp < Ny),                                                  // left-upper cell in Nx-by-Ny grid
-         mt_pm = (ip < Nx) && (j  > 0 ),                                                  // right-bottom cell in Nx-by-Ny grid
-         mt_pp = (ip < Nx) && (jp < Ny);                                                  // right-upper cell in Nx-by-Ny grid
-    if (mt != NULL) {
-        //if (mt_mm) {mt_mm = mt[im + Nxc*jm];}                                             // left-bottom cell in material; flatten_c(i, j) = i + Nxc*j
-        if (mt_mp) {mt_mp = mt[im + Nxc*j ];}                                             // left-upper cell in material
-        if (mt_pm) {mt_pm = mt[i  + Nxc*jm];}                                             // right-bottom cell in material
-        if (mt_pp) {mt_pp = mt[i  + Nxc*j ];}                                             // right-upper cell in material
-    }
+
+    real_t r_p0 = IS_FLAG_RIGHT_LINK(flags[n]); 
+    real_t r_0p = IS_FLAG_TOP_LINK(flags[n]);
     
     if (i < Nxa && j < Nya) { // # bulk: jx = kappa^2 * [(self.a[i,j+1] - 2*self.a[i,j] + self.a[i,j-1]) / dy^2 - ((self.b[i+1,j] - self.b[i,j]) - (self.b[i+1,j-1] - self.b[i,j-1])) / (dx*dy)]
         n = i + Nxa*j; // n = flatten_ab(0 ,i, j)
@@ -217,13 +190,7 @@ void free_energy_jacobian_A(
         g_jac *= kappa2;
 #endif
         
-        if (mt_pm || mt_pp) {
-#if EDGES == EDGES_DU
-            real_t r_p0 = 0.5*((mt_pm?1.0:0.0) + (mt_pp?1.0:0.0));
-#elif EDGES == EDGES_WA
-            real_t r_p0 = (mt_pm || mt_pp)?1.0:0.0;
-#endif
-            
+        if (r_p0){ 
             p = 0.0;
             if (abei != NULL) p += abei[n];
             if (ab != NULL) p += ab[n];
@@ -281,13 +248,7 @@ void free_energy_jacobian_A(
         g_jac *= kappa2;
 #endif
         
-        if (mt_mp || mt_pp) {
-#if EDGES == EDGES_DU
-            real_t r_0p = 0.5*((mt_mp?1.0:0.0) + (mt_pp?1.0:0.0));
-#elif EDGES == EDGES_WA
-            real_t r_0p = (mt_mp || mt_pp)?1.0:0.0;
-#endif
-            
+        if (r_0p) {
             p = 0.0;
             if (abei != NULL) p += abei[n];
             if (ab != NULL) p += ab[n];
@@ -317,7 +278,7 @@ void free_energy_conjgrad_coef_psi(
     real_t epsilon,
     real_t *epsilon_spatial,
     real_t H,
-    bool *mt, 
+    const int32_t *flags, 
     complex_t *psi,
     complex_t *dpsi,
     real_t *abei,
@@ -358,34 +319,13 @@ void free_energy_conjgrad_coef_psi(
     if (n < Nx*Ny) {
         int32_t i, j;
         unflatten(n, Nx, &i, &j);
-        int32_t im = i-1, ip = i+1, jm = j-1, jp = j+1;
+        int32_t ip = i+1, jp = j+1;
         
-        bool mt_mm = (i  > 0 ) && (j  > 0 ),                                                  // left-bottom cell in Nx-by-Ny grid
-             mt_mp = (i  > 0 ) && (jp < Ny),                                                  // left-upper cell in Nx-by-Ny grid
-             mt_pm = (ip < Nx) && (j  > 0 ),                                                  // right-bottom cell in Nx-by-Ny grid
-             mt_pp = (ip < Nx) && (jp < Ny);                                                  // right-upper cell in Nx-by-Ny grid
-        if (mt != NULL) {
-            if (mt_mm) {mt_mm = mt[im + Nxc*jm];}                                             // left-bottom cell in material; flatten_c(i, j) = i + Nxc*j
-            if (mt_mp) {mt_mp = mt[im + Nxc*j ];}                                             // left-upper cell in material
-            if (mt_pm) {mt_pm = mt[i  + Nxc*jm];}                                             // right-bottom cell in material
-            if (mt_pp) {mt_pp = mt[i  + Nxc*j ];}                                             // right-upper cell in material
-        }
         
-        // TODO: optimize this if-statement. E.g. store mt of links (mt_mm || mt_mp, mt_pm || mt_pp, etc) in 6 bytes of mt_psi; in this case there will be only one memory access to mt_psi[n]
-    if (mt_mm || mt_mp || mt_pm || mt_pp) {
-#if EDGES == EDGES_DU
-            real_t r_m0 = 0.5*((mt_mm?1.0:0.0) + (mt_mp?1.0:0.0));
-            real_t r_p0 = 0.5*((mt_pm?1.0:0.0) + (mt_pp?1.0:0.0));
-            real_t r_0m = 0.5*((mt_mm?1.0:0.0) + (mt_pm?1.0:0.0));
-            real_t r_0p = 0.5*((mt_mp?1.0:0.0) + (mt_pp?1.0:0.0));
-            real_t g = 0.25 * (r_m0 + r_p0 + r_0m + r_0p);
-#elif EDGES == EDGES_WA
-            real_t r_m0 = (mt_mm || mt_mp)?1.0:0.0;
-            real_t r_p0 = (mt_pm || mt_pp)?1.0:0.0;
-            real_t r_0m = (mt_mm || mt_pm)?1.0:0.0;
-            real_t r_0p = (mt_mp || mt_pp)?1.0:0.0;
+    if (IS_FLAG_COMPUTE_PSI(flags[n])) {
+            real_t r_p0 = IS_FLAG_RIGHT_LINK(flags[n]); 
+            real_t r_0p = IS_FLAG_TOP_LINK(flags[n]);
             real_t g = 1.0;
-#endif
             
             complex_t psi00 = psi[n],
                         psi1,
@@ -406,7 +346,7 @@ void free_energy_conjgrad_coef_psi(
 #endif
         
 #if CALC_GRAD_X_TERM
-            if (mt_pm || mt_pp) {
+            if (r_p0) {
                 ph = 0.0;
                 if (abei != NULL) ph += dx*abei[     i  + Nxa*j ];
                 if (ab != NULL) ph += dx*ab[     i  + Nxa*j ];
@@ -425,7 +365,7 @@ void free_energy_conjgrad_coef_psi(
             }
 #endif
 #if CALC_GRAD_Y_TERM
-            if (mt_mp || mt_pp) {
+            if (r_0p) {
                 ph = 0.0;
                 if (abei != NULL) ph += dy*abei[Na + i  + Nxb*j ];
                 if (ab != NULL) ph += dy*ab[Na + i  + Nxb*j ];
@@ -480,7 +420,7 @@ free_energy_conjgrad_coef(
     real_t epsilon,
     real_t *epsilon_spatial,
     real_t H,
-    bool *mt, 
+    const int32_t *flags, 
     complex_t *psi,
     complex_t *dpsi,
     real_t *abei,
@@ -512,18 +452,7 @@ free_energy_conjgrad_coef(
     if (n < Nx*Ny) {
         int32_t i, j;
         unflatten(n, Nx, &i, &j);
-        int32_t im = i-1, ip = i+1, jm = j-1, jp = j+1;
-        
-        bool mt_mm = (i  > 0 ) && (j  > 0 ),                                                  // left-bottom cell in Nx-by-Ny grid
-             mt_mp = (i  > 0 ) && (jp < Ny),                                                  // left-upper cell in Nx-by-Ny grid
-             mt_pm = (ip < Nx) && (j  > 0 ),                                                  // right-bottom cell in Nx-by-Ny grid
-             mt_pp = (ip < Nx) && (jp < Ny);                                                  // right-upper cell in Nx-by-Ny grid
-        if (mt != NULL) {
-            if (mt_mm) {mt_mm = mt[im + Nxc*jm];}                                             // left-bottom cell in material; flatten_c(i, j) = i + Nxc*j
-            if (mt_mp) {mt_mp = mt[im + Nxc*j ];}                                             // left-upper cell in material
-            if (mt_pm) {mt_pm = mt[i  + Nxc*jm];}                                             // right-bottom cell in material
-            if (mt_pp) {mt_pp = mt[i  + Nxc*j ];}                                             // right-upper cell in material
-        }
+        int32_t ip = i+1, jp = j+1;
         
 #define c00 Ctmp[0]
 #define c01 Ctmp[1]
@@ -543,21 +472,10 @@ free_energy_conjgrad_coef(
 #define c30 Ctmp[15]
 #define c40 Ctmp[16]
         
-        // TODO: optimize this if-statement. E.g. store mt of links (mt_mm || mt_mp, mt_pm || mt_pp, etc) in 6 bytes of mt_psi; in this case there will be only one memory access to mt_psi[n]
-        if (mt_mm || mt_mp || mt_pm || mt_pp) {
-#if EDGES == EDGES_DU
-            real_t r_m0 = 0.5*((mt_mm?1.0:0.0) + (mt_mp?1.0:0.0));
-            real_t r_p0 = 0.5*((mt_pm?1.0:0.0) + (mt_pp?1.0:0.0));
-            real_t r_0m = 0.5*((mt_mm?1.0:0.0) + (mt_pm?1.0:0.0));
-            real_t r_0p = 0.5*((mt_mp?1.0:0.0) + (mt_pp?1.0:0.0));
-            real_t g = 0.25 * (r_m0 + r_p0 + r_0m + r_0p);
-#elif EDGES == EDGES_WA
-            real_t r_m0 = (mt_mm || mt_mp)?1.0:0.0;
-            real_t r_p0 = (mt_pm || mt_pp)?1.0:0.0;
-            real_t r_0m = (mt_mm || mt_pm)?1.0:0.0;
-            real_t r_0p = (mt_mp || mt_pp)?1.0:0.0;
+        if (IS_FLAG_COMPUTE_PSI(flags[n])) {
+            real_t r_p0 = IS_FLAG_RIGHT_LINK(flags[n]); 
+            real_t r_0p = IS_FLAG_TOP_LINK(flags[n]);
             real_t g = 1.0;
-#endif
             
             complex_t psi0 = psi[n],
                       psi1,
@@ -578,7 +496,7 @@ free_energy_conjgrad_coef(
 #endif
         
 #if CALC_GRAD_X_TERM
-            if (mt_pm || mt_pp) {
+            if (r_p0) {
                 ph = 0.0;
                 if (abei != NULL) ph += dx * abei[i + Nxa*j];
                 if (ab   != NULL) ph += dx * ab  [i + Nxa*j];
@@ -631,7 +549,7 @@ free_energy_conjgrad_coef(
             }
 #endif
 #if CALC_GRAD_Y_TERM
-            if (mt_mp || mt_pp) {
+            if (r_0p) {
                 ph = 0.0;
                 if (abei != NULL) ph += dy * abei[Na + i + Nxb*j];
                 if (ab   != NULL) ph += dy * ab  [Na + i + Nxb*j];

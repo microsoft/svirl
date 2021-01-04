@@ -68,7 +68,7 @@ class Observables(object):
             self.params._vpei.sync()
 
         self.__supercurrent_density_krnl(
-            self.mesh.material_tiling_h(),
+            self.mesh._flags_h(),
             self.vars.order_parameter_h(),
             self.params.external_irregular_vector_potential_h(),
             self.vars.vector_potential_h(),
@@ -136,7 +136,7 @@ class Observables(object):
             self.params.linear_coefficient_h(),
             self.params.homogeneous_external_field,
 
-            self.mesh.material_tiling_h(),
+            self.mesh._flags_h(),
             self.vars.order_parameter_h(),
             self.params.external_irregular_vector_potential_h(),
             self.vars.vector_potential_h(),

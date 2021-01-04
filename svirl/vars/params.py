@@ -10,9 +10,11 @@ from . import FixedVortices
 class Params(object):
     """This class contains setters and getters for parameters"""
 
-    def __init__(self, mesh, vars):
+    # use a leading underscore in vars to avoid clashing 
+    # with Python's keyword
+    def __init__(self, mesh, _vars):
         self.mesh = mesh
-        self.vars = vars
+        self.vars = _vars
         self.fixed_vortices = FixedVortices(self.mesh, self.vars) 
 
         self.solveA = False 
@@ -158,7 +160,7 @@ class Params(object):
         
         # TODO: implement GPU version of ab initialization
         # Possible set of gauges, A = [g*y*H, (1-g)*x*H, 0] with any g, 0 <= g <= 1
-        g = 0.5
+        g = 1.0
         _, yg = self.mesh.xy_a_grid
         xg, _ = self.mesh.xy_b_grid
 

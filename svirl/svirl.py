@@ -159,7 +159,7 @@ class GLSolver(object):
 
         self.par.red = GLPar.Reduction(self.par)
 
-        self.mesh = GLMesh.Grid()
+        self.mesh = GLMesh.Grid(self.par)
 
         self.vars = GLVars.Vars(self.par, self.mesh)
 
@@ -177,32 +177,4 @@ class GLSolver(object):
 
     def __del__(self):
         pass
-
-
-# --------------------------------------------------------------------------------
-
-    # Used in tests, so including it here
-    def flatten_a_array(self, a):
-        return np.reshape(a.T, self.cfg.Na)
-
-
-    def unflatten_a_array(self, a):
-        return np.reshape(a, (self.cfg.Nya, self.cfg.Nxa)).T
-
-
-    def flatten_b_array(self, b):
-        return np.reshape(b.T, self.cfg.Nb)
-
-
-    def unflatten_b_array(self, b):
-        return np.reshape(b, (self.cfg.Nyb, self.cfg.Nxb)).T
-
-
-    def flatten_array(self, psi):
-        return np.reshape(psi.T, self.cfg.N)
-
-
-    def unflatten_array(self, psi):
-        return np.reshape(psi, (self.cfg.Ny, self.cfg.Nx)).T
-
 

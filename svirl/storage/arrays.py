@@ -134,7 +134,7 @@ class GArray(object):
                         specified. Using shape as the input.")
                 nelements = None # Note that this will be updated later
 
-        supported_types = (np.float32, np.float64, np.complex64, np.complex128) 
+        supported_types = (np.float32, np.float64, np.complex64, np.complex128, np.bool, np.byte, np.int32) 
         if dtype not in supported_types:
             raise TypeError("\n `dtype` supports only the \
                     following types: \n", supported_types)

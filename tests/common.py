@@ -56,3 +56,30 @@ def apply_material_tiling(gl, type='random', verbose=False):
     gl.mesh.material_tiling = mt
     gl.vars.set_order_parameter_to_zero_outside_material()
     if verbose: print(gl.mesh.material_tiling, '\n')
+
+
+# Some utils for reshaping arrays
+def flatten_a_array(gl, a):
+    return np.reshape(a.T, gl.cfg.Na)
+
+
+def unflatten_a_array(gl, a):
+    return np.reshape(a, (gl.cfg.Nya, gl.cfg.Nxa)).T
+
+
+def flatten_b_array(gl, b):
+    return np.reshape(b.T, gl.cfg.Nb)
+
+
+def unflatten_b_array(gl, b):
+    return np.reshape(b, (gl.cfg.Nyb, gl.cfg.Nxb)).T
+
+
+def flatten_array(gl, psi):
+    return np.reshape(psi.T, gl.cfg.N)
+
+
+def unflatten_array(gl, psi):
+    return np.reshape(psi, (gl.cfg.Ny, gl.cfg.Nx)).T
+
+

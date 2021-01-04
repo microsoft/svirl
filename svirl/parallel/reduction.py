@@ -178,7 +178,7 @@ class Reduction(object):
     # nv: no. of vectors, ne: no. elements per vector
     def test_sum_v(self, a_in, nv, ne, block_size = 256):
 
-        assert ne is 5
+        assert ne == 5
         assert block_size >= 0 and block_size <= 1024
 
         ga_in = gpuarray.to_gpu(cfg.dtype(a_in))

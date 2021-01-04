@@ -158,7 +158,7 @@ void current_density(
 
 __global__
 void supercurrent_density(
-    bool *mt,
+    const int32_t *flags,
     complex_t *psi,
     real_t *abei,
     real_t *ab,
@@ -166,8 +166,7 @@ void supercurrent_density(
 ) {
     const int32_t Nx = %(Nx)s, Ny = %(Ny)s,
                   Nxa = %(Nx)s-1, Nya = %(Ny)s, Na = (%(Nx)s-1)*%(Ny)s,
-                  Nxb = %(Nx)s,   Nyb = %(Ny)s - 1,
-                  Nxc = %(Nx)s-1; //, Nyc = %(Ny)s-1;
+                  Nxb = %(Nx)s,   Nyb = %(Ny)s - 1;
     
     const real_t dx = %(dx)s, dy = %(dy)s,
                    idx = 1.0/%(dx)s, idy = 1.0/%(dy)s;
@@ -179,31 +178,17 @@ void supercurrent_density(
 
     int i, j;
     unflatten(n, Nx, &i, &j);
-    int32_t im = i-1, ip = i+1, jm = j-1, jp = j+1;
     
     real_t abei_ab, jl;
     complex_t psi0 = psi[i + Nx*j];
     
-    bool //mt_mm = (i  > 0 ) && (j  > 0 ),                                                  // left-bottom cell in Nx-by-Ny grid
-         mt_mp = (i  > 0 ) && (jp < Ny),                                                  // left-upper cell in Nx-by-Ny grid
-         mt_pm = (ip < Nx) && (j  > 0 ),                                                  // right-bottom cell in Nx-by-Ny grid
-         mt_pp = (ip < Nx) && (jp < Ny);                                                  // right-upper cell in Nx-by-Ny grid
-    if (mt != NULL) {
-        //if (mt_mm) {mt_mm = mt[im + Nxc*jm];}                                             // left-bottom cell in material; flatten_c(i, j) = i + Nxc*j
-        if (mt_mp) {mt_mp = mt[im + Nxc*j ];}                                             // left-upper cell in material
-        if (mt_pm) {mt_pm = mt[i  + Nxc*jm];}                                             // right-bottom cell in material
-        if (mt_pp) {mt_pp = mt[i  + Nxc*j ];}                                             // right-upper cell in material
-    }
+    real_t r_p0 = (real_t ) IS_FLAG_RIGHT_LINK(flags[n]); 
+    real_t r_0p = (real_t ) IS_FLAG_TOP_LINK(flags[n]);
     
     if (i < Nxa && j < Nya) {
         n = i + Nxa*j;
         jl = 0.0;
-        if (mt_pm || mt_pp) {
-#if EDGES == EDGES_DU
-            real_t r_p0 = 0.5*((mt_pm?1.0:0.0) + (mt_pp?1.0:0.0));
-#elif EDGES == EDGES_WA
-            real_t r_p0 = (mt_pm || mt_pp)?1.0:0.0;
-#endif
+        if (r_p0) {
             
             abei_ab = 0.0;
             if (abei != NULL) abei_ab += abei[n];
@@ -217,13 +202,7 @@ void supercurrent_density(
     if (i < Nxb && j < Nyb) {
         n = Na + i + Nxb*j;
         jl = 0.0;
-        if (mt_mp || mt_pp) {
-#if EDGES == EDGES_DU
-            real_t r_0p = 0.5*((mt_mp?1.0:0.0) + (mt_pp?1.0:0.0));
-#elif EDGES == EDGES_WA
-            real_t r_0p = (mt_mp || mt_pp)?1.0:0.0;
-#endif
-            
+        if (r_0p) {
             abei_ab = 0.0;
             if (abei != NULL) abei_ab += abei[n];
             if (ab != NULL) abei_ab += ab[n];
@@ -253,7 +232,7 @@ void free_energy_pseudodensity(
     real_t epsilon,
     real_t *epsilon_spatial,
     real_t H,
-    bool *mt, 
+    const int32_t *flags, 
     complex_t *psi,
     real_t *abei,
     real_t *ab,
@@ -276,34 +255,13 @@ void free_energy_pseudodensity(
     if (n < Nx*Ny) {
         int32_t i, j;
         unflatten(n, Nx, &i, &j);
-        int32_t im = i-1, ip = i+1, jm = j-1, jp = j+1;
+        int32_t ip = i+1, jp = j+1;
         
-        bool mt_mm = (i  > 0 ) && (j  > 0 ),                                                  // left-bottom cell in Nx-by-Ny grid
-             mt_mp = (i  > 0 ) && (jp < Ny),                                                  // left-upper cell in Nx-by-Ny grid
-             mt_pm = (ip < Nx) && (j  > 0 ),                                                  // right-bottom cell in Nx-by-Ny grid
-             mt_pp = (ip < Nx) && (jp < Ny);                                                  // right-upper cell in Nx-by-Ny grid
-        if (mt != NULL) {
-            if (mt_mm) {mt_mm = mt[im + Nxc*jm];}                                             // left-bottom cell in material; flatten_c(i, j) = i + Nxc*j
-            if (mt_mp) {mt_mp = mt[im + Nxc*j ];}                                             // left-upper cell in material
-            if (mt_pm) {mt_pm = mt[i  + Nxc*jm];}                                             // right-bottom cell in material
-            if (mt_pp) {mt_pp = mt[i  + Nxc*j ];}                                             // right-upper cell in material
-        }
-        
-        // TODO: optimize this if-statement. E.g. store mt of links (mt_mm || mt_mp, mt_pm || mt_pp, etc) in 6 bytes of mt_psi; in this case there will be only one memory access to mt_psi[n]
-        if (mt_mm || mt_mp || mt_pm || mt_pp) {
-#if EDGES == EDGES_DU
-            real_t r_m0 = 0.5*((mt_mm?1.0:0.0) + (mt_mp?1.0:0.0));
-            real_t r_p0 = 0.5*((mt_pm?1.0:0.0) + (mt_pp?1.0:0.0));
-            real_t r_0m = 0.5*((mt_mm?1.0:0.0) + (mt_pm?1.0:0.0));
-            real_t r_0p = 0.5*((mt_mp?1.0:0.0) + (mt_pp?1.0:0.0));
-            real_t g = 0.25 * (r_m0 + r_p0 + r_0m + r_0p);
-#elif EDGES == EDGES_WA
-            real_t r_m0 = (mt_mm || mt_mp)?1.0:0.0;
-            real_t r_p0 = (mt_pm || mt_pp)?1.0:0.0;
-            real_t r_0m = (mt_mm || mt_pm)?1.0:0.0;
-            real_t r_0p = (mt_mp || mt_pp)?1.0:0.0;
+        if (IS_FLAG_COMPUTE_PSI(flags[n])) {
+            real_t r_p0 = IS_FLAG_RIGHT_LINK(flags[n]); 
+            real_t r_0p = IS_FLAG_TOP_LINK(flags[n]);
             real_t g = 1.0;
-#endif
+
             complex_t psi00 = psi[n];
             real_t psi00_2 = abs2(psi00);
             
@@ -319,7 +277,7 @@ void free_energy_pseudodensity(
             //     e += r_m0 * idx2 * g_grad(psi00, - dx*ab[     im + Nxa*j ], psi[im + Nx*j ]);
             // }
 #if CALC_GRAD_X_TERM
-            if (mt_pm || mt_pp) {
+            if (r_p0) {
                 ph = 0.0;
                 if (abei != NULL) ph += abei[i + Nxa*j];
                 if (ab != NULL) ph += ab[i + Nxa*j];
@@ -331,7 +289,7 @@ void free_energy_pseudodensity(
             //     e += r_0m * idy2 * g_grad(psi00, - dy*ab[Na + i  + Nxb*jm], psi[i  + Nx*jm]);
             // }
 #if CALC_GRAD_Y_TERM
-            if (mt_mp || mt_pp) {
+            if (r_0p) {
                 ph = 0.0;
                 if (abei != NULL) ph += abei[Na + i + Nxb*j];
                 if (ab != NULL) ph += ab[Na + i + Nxb*j];

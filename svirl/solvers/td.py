@@ -12,7 +12,7 @@ from svirl.storage import GArray
 
 class TD(object):
     """This class contains methods that solve the order parameter 
-    and vector potential.
+    and vector potential equations.
     """
 
     def __init__(self, par, mesh, _vars, params, observables):
@@ -26,11 +26,28 @@ class TD(object):
         self.solveA = self.params.solveA
 
         self.__order_parameter_phase_lock_krnl = self.par.get_function('order_parameter_phase_lock')
+        self.__add_Langevin_noise_term_krnl = self.par.get_function('add_Langevin_noise_term')
+
+        self.__outer_iteration_convergence_check_order_parameter_krnl = self.par.get_function('outer_iteration_convergence_check_order_parameter')
+        self.__outer_iteration_convergence_check_vector_potential_krnl = self.par.get_function('outer_iteration_convergence_check_vector_potential')
+
         self.__iterate_order_parameter_jacobi_step_krnl = self.par.get_function('iterate_order_parameter_jacobi_step')
-        self.__iterate_vector_potential_jacobi_step_krnl = self.par.get_function('iterate_vector_potential_jacobi_step')
+        self.__iterate_vector_potential_x_jacobi_step_krnl = self.par.get_function('iterate_vector_potential_x_jacobi_step')
+        self.__iterate_vector_potential_y_jacobi_step_krnl = self.par.get_function('iterate_vector_potential_y_jacobi_step')
+        self.__update_order_parameter_rhs_krnl = self.par.get_function('update_order_parameter_rhs')
+        self.__update_vector_potential_rhs_krnl = self.par.get_function('update_vector_potential_rhs')
 
         self.__xpy_r_krnl = self.par.get_function('xpy_r')
         self.__xmy_r_krnl = self.par.get_function('xmy_r')
+
+        self.__copy_vector_potential_y_krnl = self.par.get_function('copy_vector_potential_y')
+        self.__copy_vector_potential_x_krnl = self.par.get_function('copy_vector_potential_x')
+
+        # beta = 1.0 for backward Euler, 1/2 for Crank-Nicolson, 0 for explicit
+        self.__beta_cn = cfg.dtype(0.5)
+
+        self._random_t_psi = np.uint32(1)
+        self._random_t_ab  = np.uint32(2)
 
         self._random_t = np.uint32(1)
         if cfg.random_seed is not None:
@@ -39,14 +56,25 @@ class TD(object):
         # Alloc the rhs arrays
         self.vars._tmp_node_var = GArray(like = self.vars._psi)
 
+        # Alloc tmp edge storage (for vector potential solver)
         shapes = [(cfg.Nxa, cfg.Nya), (cfg.Nxb, cfg.Nyb)]
         self.vars._tmp_edge_var = GArray(shape = shapes, dtype = cfg.dtype)
 
         A_size = self.vars.vector_potential_h().size
 
-        self.__gab_next = gpuarray.zeros(A_size, dtype = cfg.dtype)
+        self.__gab_next  = gpuarray.zeros(A_size, dtype = cfg.dtype)
         self.__gpsi_next = gpuarray.empty_like(self.vars.order_parameter_h())
-        self.__gr2_max = gpuarray.zeros(1, dtype = np.int32)
+        self.__gr2_max   = gpuarray.zeros(1, dtype = np.int32)
+
+        self.__psi_outer_residual = gpuarray.zeros(1, dtype = np.int32)
+        self.__ab_outer_residual  = gpuarray.zeros(1, dtype = np.int32)
+
+        self.__njacobi_iterations = 1024
+        self.__nouter_iterations = 5
+
+        self._njacobi_order_parameter_total = 0
+        self._njacobi_vector_potential_total = 0
+        self._nouter_total = 0
 
         # Adjust stopping criteria according to precision
         if cfg.dtype is np.float32:
@@ -65,11 +93,16 @@ class TD(object):
         cfg.stop_criterion_order_parameter = cfg.dtype(cfg.stop_criterion_order_parameter)
         cfg.stop_criterion_vector_potential = cfg.dtype(cfg.stop_criterion_vector_potential)
 
+        cfg.stop_criterion_outer_iteration = cfg.dtype(1e-4)
+
 
     def __del__(self):
         if hasattr(self, '__gr2_max')   and self.__gr2_max   is not None:  self.__gr2_max.gpudata.free()
         if hasattr(self, '__gpsi_next') and self.__gpsi_next is not None:  self.__gpsi_next.gpudata.free()
         if hasattr(self, '__gab_next')  and self.__gab_next  is not None:  self.__gab_next.gpudata.free()
+
+        if hasattr(self, '__psi_outer_residual')  and self.__psi_outer_residual  is not None:  self.__psi_outer_residual.gpudata.free()
+        if hasattr(self, '__ab_outer_residual')   and self.__ab_outer_residual   is not None:  self.__ab_outer_residual.gpudata.free()
 
 
     def _set_iterator_options(self, iterator_type, Nt=None, dt=None, T=None, mandatory_definition=True):
@@ -101,10 +134,18 @@ class TD(object):
             self.Nt = np.int32(Nt) if Nt is not None else None
             self.dt = cfg.dtype(dt) if dt is not None else None
             self.T  = cfg.dtype(T) if T is not None else None
+
+            cfg.dt = self.dt
+            cfg.Nt = self.Nt
+            cfg.T = self.T
         elif iterator_type == 'vector_potential':
             self.NtA = np.int32(Nt) if Nt is not None else None
             self.dtA = cfg.dtype(dt) if dt is not None else None
             self.TA  = cfg.dtype(T) if T is not None else None
+
+            cfg.dtA = self.dtA
+            cfg.NtA = self.NtA
+            cfg.TA = self.TA
 
 
     def __stability_warnings_order_parameter(self):
@@ -154,14 +195,35 @@ class TD(object):
                     ) 
 
 
-    def __iterate_order_parameter_gpu(self, gab_gabi):
+    def __update_order_parameter_rhs(self):
+
+        # RHS doesn't change if beta = 1
+        if self.__beta_cn < 1.0:
+
+            self.__update_order_parameter_rhs_krnl(
+                    self.dt,
+
+                    self.params.linear_coefficient_scalar_h(),
+                    self.params.linear_coefficient_h(),
+                    self.mesh._flags_h(),
+
+                    self.params.order_parameter_Langevin_coefficient,
+                    self._random_t_psi,
+                    self.__beta_cn, 
+
+                    self.vars.vector_potential_h(),
+                    self.vars.order_parameter_h(),
+                    self.vars._tmp_node_var_h(), 
+
+                    grid  = (self.par.grid_size, 1, 1),
+                    block = (self.par.block_size, 1, 1), 
+                )
+
+
+    def __iterate_order_parameter_gpu(self):
         """Performs dt-iteration of self.psi on GPU"""
 
-        # similar to gpsi_rhs = gpsi.copy(), but does not allocate new array
-        Utils.copy_dtod(self.vars._tmp_node_var_h(), self.vars.order_parameter_h())
-        #self.vars._tmp_node_var.need_dtoh_sync()
-
-        for j in range(1024):
+        for j in range(self.__njacobi_iterations):
             self.__gr2_max.fill(np.int32(0))
 
             # TODO: prepare all cuda calls
@@ -169,56 +231,41 @@ class TD(object):
                 self.dt,
                 self.params.linear_coefficient_scalar_h(),
                 self.params.linear_coefficient_h(),
-                self.mesh.material_tiling_h(),
-                gab_gabi, 
+                self.mesh._flags_h(),
 
-                self.vars._tmp_node_var_h(),  # psi for right-hand side; does not change during Jacobi interactions
-                self.vars.order_parameter_h(),      # psi^{j} in Jacobi method
-                self.__gpsi_next,                     # psi^{j+1} in Jacobi method
+                self.__beta_cn,  # if __beta_cn = 1/2, RHS needs to be updated first
 
-                self.params.order_parameter_Langevin_coefficient,
-                np.uint32(j),
-                self._random_t,
+                # vector potential (w/ or w/o irreg. vector potential) 
+                self.vars._ab_outer_prev_h() if self.solveA else self.vars.vector_potential_h(),
+
+                self.vars._psi_outer_prev_h(),    # psi for non-linear term in discretization (can be same as psi^{j})
+                self.vars._tmp_node_var_h(),      # psi for right-hand side; does not change during Jacobi interactions
+                self.vars._psi_outer_h(),         # psi^{j} in Jacobi method
+                self.__gpsi_next,                 # psi^{j+1} in Jacobi method
 
                 cfg.stop_criterion_order_parameter,
                 self.__gr2_max,
+
                 grid  = (self.par.grid_size, 1, 1),
                 block = (self.par.block_size, 1, 1), 
             )
 
             # swap pointers, does not change arrays
-            # TODO: this is hard-wired for now since python doesn't allow
-            # assignment for a function call.Sync Status not updated
-
-            self.vars._psi._gdata, self.__gpsi_next = self.__gpsi_next, self.vars._psi._gdata
-            #self.vars.order_parameter_h(), self.__gpsi_next = self.__gpsi_next, self.vars.order_parameter_h()
+            self.vars._psi_outer._gdata, self.__gpsi_next = self.__gpsi_next, self.vars._psi_outer._gdata
 
             # residual = max{|b-M*psi|} 
             # r2_max_norm = residual/stop_criterion 
             r2_max_norm = 1.0e-4 * cfg.dtype(self.__gr2_max.get()[0]) 
 
+            self._njacobi_order_parameter_total += 1 
+
             # convergence criteria
             if r2_max_norm < 1.0: 
+                #print('Order parameter converged (j, res): ', j, r2_max_norm, flush=True)
                 break
 
-        self._random_t += np.uint32(1)
 
-        if self.fixed_vortices._phase_lock_ns is not None:
-            block_size = 2
-            grid_size = Utils.intceil(self.fixed_vortices._phase_lock_ns.size, block_size)
-
-            self.__order_parameter_phase_lock_krnl(
-                self.vars.order_parameter_h(),
-                np.int32(self.fixed_vortices._phase_lock_ns.size),
-                self.fixed_vortices._phase_lock_ns_h(),
-                grid  = (grid_size, 1, 1),
-                block = (block_size, 1, 1), 
-            )
-
-        self.vars._psi.need_dtoh_sync()
-
-
-    def __iterate_order_parameter(self, dt = None, Nt = None, T = None):
+    def __iterate_order_parameter(self, dt, Nt, T):
         """Performs Nt dt-iterations of self.psi"""
         
         self._set_iterator_options(iterator_type = 'order_parameter', 
@@ -232,6 +279,7 @@ class TD(object):
 
 
     def __stability_warnings_vector_potential(self):
+
         d = self.dtA*self.params.gl_parameter**2 / (self.params.normal_conductivity * min(cfg.dx,cfg.dy)**2)
         if d > 1.0:
             if not hasattr(self, '___stability_warning_vector_potential_0_shown') or self.___stability_warning_vector_potential_0_shown == 0:
@@ -249,83 +297,228 @@ class TD(object):
             self.__stability_warning_vector_potential_1_shown = 0
 
 
-    def __iterate_vector_potential_gpu(self):
-        """Performs dtA-iteration of self.a/self.b on GPU"""
+    def __add_Langevin_noise_term(self, which = 'order_parameter'):
 
-        # self.gabi += self.gab; no memory allocation
-        if self.fixed_vortices._vpi is not None:
-            self.__xpy_r_krnl(
-                 self.fixed_vortices.irregular_vector_potential_h(), 
-                 self.vars.vector_potential_h(),
-                 np.uint32(cfg.N),
-                 block = (self.par.block_size, 1, 1), 
-                 grid = (self.par.grid_size, 1, 1)
-                 ) 
-            gabi_gab = self.fixed_vortices.irregular_vector_potential_h()  # just a pointer
-        else:
-            gabi_gab = self.vars.vector_potential_h()
+        # For psi
+        if which == 'order_parameter':
 
-        # similar to gab_rhs = gab.copy(), but does not allocate new array
-        Utils.copy_dtod(self.vars._tmp_edge_var_h(), self.vars.vector_potential_h())
-        #self.vars._tmp_edge_var.need_dtoh_sync()
+            # Add Langevin contribution
+            if self.params.order_parameter_Langevin_coefficient > 1.0e-32:
+                self.__add_Langevin_noise_term_krnl(
+                        self.mesh.material_tiling_h(),
 
-        # if self.ab_langevin_c > 1e-16:
-        #     self.gab_rhs += self.ab_langevin_c*(curand(self.gab_rhs.shape, dtype=cfg.dtype) - 0.5)
-        for j in range(1024):
-            self.__gr2_max.fill(np.int32(0))
+                        self.vars._tmp_node_var_h(), 
+                        np.uintp(0),
 
-            self.__iterate_vector_potential_jacobi_step_krnl(
-                self.dt, 
+                        self.params.order_parameter_Langevin_coefficient,
+                        self._random_t_psi,
+
+                        np.int(0),
+
+                        grid  = (self.par.grid_size, 1, 1),
+                        block = (self.par.block_size, 1, 1), 
+                        )
+
+                self._random_t_psi += 2
+        elif which == 'vector_potential':
+
+            # Add Langevin contribution
+            if self.params.vector_potential_Langevin_coefficient > 1.0e-32:
+                self.__add_Langevin_noise_term_krnl(
+                        np.uintp(0),
+
+                        np.uintp(0),
+                        self.vars._tmp_edge_var_h(), 
+
+                        self.params.vector_potential_Langevin_coefficient,
+                        self._random_t_ab,
+
+                        np.int(1),
+
+                        grid  = (self.par.grid_size, 1, 1),
+                        block = (self.par.block_size, 1, 1), 
+                        )
+
+                self._random_t_ab += 2
+
+
+    def __outer_iteration_convergence_check_order_parameter(self):
+        self.__psi_outer_residual.fill(np.int32(0))
+
+        self.__outer_iteration_convergence_check_order_parameter_krnl(
+                self.vars._psi_outer_h(),
+                self.vars._psi_outer_prev_h(),
+
+                cfg.stop_criterion_outer_iteration,
+                self.__psi_outer_residual,
+
+                grid  = (self.par.grid_size, 1, 1),
+                block = (self.par.block_size, 1, 1), 
+                )
+
+        r_max_norm = 1.0e-4 * cfg.dtype(self.__psi_outer_residual.get()[0]) 
+        #if r_max_norm < 1.0: 
+            #print('  psi outer iteration converged with a residual: ', r_max_norm, flush=True)
+
+        return r_max_norm
+
+
+    def __outer_iteration_convergence_check_vector_potential(self):
+        if not self.solveA:
+            return 0
+
+        self.__ab_outer_residual.fill(np.int32(0))
+
+        grid_size = Utils.intceil(cfg.Nab, self.par.block_size)
+
+        self.__outer_iteration_convergence_check_vector_potential_krnl(
+                self.vars._ab_outer_h(),
+                self.vars._ab_outer_prev_h(),
+
+                cfg.stop_criterion_outer_iteration,
+                self.__ab_outer_residual,
+
+                grid  = (grid_size, 1, 1),
+                block = (self.par.block_size, 1, 1), 
+                )
+
+        r_max_norm = 1.0e-4 * cfg.dtype(self.__ab_outer_residual.get()[0]) 
+        #if r_max_norm < 1.0: 
+        #    print('  ab outer iteration converged with a residual: ', r_max_norm, flush=True)
+
+        return r_max_norm
+
+
+    def __iterate_vector_potential_x_gpu(self):
+
+        dt_rho_kappa2 = self.dt*self.params.gl_parameter_squared_h()*self.params._rho
+        dt_rho_kappa2 = cfg.dtype(dt_rho_kappa2)
+
+        # Solve Ax
+        for j in range(self.__njacobi_iterations):
+            self.__gr2_max.fill(np.uint32(0))
+
+            self.__iterate_vector_potential_x_jacobi_step_krnl(
+                dt_rho_kappa2, 
+                self.__beta_cn,
+
+                self.vars._tmp_edge_var_h(),   # ab for right-hand side; does not change during Jacobi interactions
+                self.vars._ab_outer_h(),       # ab^{\tau+1, k} in Jacobi method
+                self.__gab_next,               # ab^{\tau+1, k+1} in Jacobi method
+
+                cfg.stop_criterion_vector_potential,
+                self.__gr2_max,
+
+                grid  = (self.par.grid_size, 1,  1),
+                block = (self.par.block_size, 1, 1), 
+                )
+
+            # swap pointers, does not change arrays
+            self.vars._ab_outer._gdata, self.__gab_next = self.__gab_next, self.vars._ab_outer._gdata
+
+            # r2_max_norm = residual/stop_criterion 
+            r2_max_norm = 1.0e-4 * cfg.dtype(self.__gr2_max.get()[0]) 
+
+            self._njacobi_vector_potential_total += 1 
+
+            # convergence criteria
+            if r2_max_norm < 1.0: 
+                #print('Vector potential x converged (j, res) ', j, r2_max_norm, flush=True)
+                break
+
+
+    def __iterate_vector_potential_y_gpu(self): # had ab_outer as argument
+
+        dt_rho_kappa2 = self.dt*self.params.gl_parameter_squared_h()*self.params._rho
+        dt_rho_kappa2 = cfg.dtype(dt_rho_kappa2)
+
+        # Solve Ay
+        for j in range(self.__njacobi_iterations):
+            self.__gr2_max.fill(np.uint32(0))
+
+            self.__iterate_vector_potential_y_jacobi_step_krnl(
+                dt_rho_kappa2, 
+                self.__beta_cn,
+
+                self.vars._tmp_edge_var_h(),   # ab for right-hand side; does not change during Jacobi interactions
+                self.vars._ab_outer_h(),       # ab^{\tau+1, k} in Jacobi method
+                self.__gab_next,               # ab^{\tau+1, k+1} in Jacobi method
+
+                cfg.stop_criterion_vector_potential,
+                self.__gr2_max,
+
+                grid  = (self.par.grid_size, 1,  1),
+                block = (self.par.block_size, 1, 1), 
+                )
+
+            # swap pointers, does not change arrays
+            self.vars._ab_outer._gdata, self.__gab_next = self.__gab_next, self.vars._ab_outer._gdata
+
+            # r2_max_norm = residual/stop_criterion 
+            r2_max_norm = 1.0e-4 * cfg.dtype(self.__gr2_max.get()[0]) 
+
+            self._njacobi_vector_potential_total += 1 
+
+            # convergence criteria
+            if r2_max_norm < 1.0: 
+                #print('Vector potential y converged (j, res) ', j, r2_max_norm, flush=True)
+                break
+
+
+    def __update_vector_potential_rhs(self):
+
+        # Update RHS (self.vars._tmp_edge_var_h)
+        self.__update_vector_potential_rhs_krnl(
+                self.dtA, 
 
                 self.params.gl_parameter_squared_h(),
                 self.params._rho,
                 self.params.homogeneous_external_field,
 
-                self.mesh.material_tiling_h(),
-                self.vars.order_parameter_h(),
-                gabi_gab,
+                self.mesh._flags_h(),
+                self.__beta_cn,
 
-                self.vars._tmp_edge_var_h(),        # ab for right-hand side; does not change during Jacobi interactions
-                self.vars.vector_potential_h(),     # ab^{j} in Jacobi method
-                self.__gab_next,                      # ab^{j+1} in Jacobi method
+                self.vars._psi_outer_prev_h(),  # psi^{\tau, k} 
+                self.vars.order_parameter_h(),    # psi^{\tau, k} 
+                self.vars._ab_outer_prev_h(),   # (a, b)^{\tau, k}
+                self.vars.vector_potential_h(), # (a, b)^{\tau}
+                self.vars._tmp_edge_var_h(),    # RHS updated by this kernel
 
-                self.params.vector_potential_Langevin_coefficient,
-                np.uint32(j),
-                self._random_t,
-                
-                cfg.stop_criterion_vector_potential,
-                self.__gr2_max,
                 grid  = (self.par.grid_size, 1,  1),
                 block = (self.par.block_size, 1, 1), 
-            )
+                )
 
-            # swap pointers, does not change arrays
-            self.vars._vp._gdata, self.__gab_next = self.__gab_next, self.vars._vp._gdata
-            #self.vars.vector_potential_h(), self.__gab_next = self.__gab_next, self.vars.vector_potential_h()
 
-            # r2_max_norm = residual/stop_criterion 
-            r2_max_norm = 1.0e-4 * cfg.dtype(self.__gr2_max.get()[0]) 
+    def __iterate_vector_potential_gpu(self):
+        """Performs dtA-iteration of self.a/self.b on GPU"""
 
-            # convergence criteria
-            if r2_max_norm < 1.0: 
-                break
+        if not self.solveA:
+            return
 
-        self._random_t += np.uint32(1)
+        self.__update_vector_potential_rhs()
 
-        self.vars._vp.need_dtoh_sync()
-        
-        # self.gabi -= self.gab; no memory allocation
-        if self.fixed_vortices._vpi is not None:
-            self.__xmy_r_krnl(
-                    self.fixed_vortices.irregular_vector_potential_h(), 
-                    self.vars.vector_potential_h(), 
-                    np.uint32(cfg.N),
-                    block = (self.par.block_size, 1, 1), 
-                    grid = (self.par.grid_size, 1, 1)
-                    ) 
+        self.__iterate_vector_potential_x_gpu() 
 
- 
-    def __iterate_vector_potential(self, dtA = None, NtA = None, TA = None):
+        self.__copy_vector_potential_y_krnl(
+                self.vars._ab_outer_h(),
+                self.__gab_next,
+
+                grid  = (self.par.grid_size, 1,  1),
+                block = (self.par.block_size, 1, 1), 
+                )
+
+        self.__iterate_vector_potential_y_gpu()
+
+        self.__copy_vector_potential_x_krnl(
+                self.vars._ab_outer_h(),
+                self.__gab_next,
+
+                grid  = (self.par.grid_size, 1,  1),
+                block = (self.par.block_size, 1, 1), 
+                )
+
+
+    def __iterate_vector_potential(self, dtA, NtA, TA):
         """Performs NtA dtA-iterations of self.a/self.b"""
         
         if not self.solveA:
@@ -339,40 +532,99 @@ class TD(object):
             self.__iterate_vector_potential_gpu()
 
 
-    def __iterate(self, dt = None, Nt = None, T = None):
-        """Performs Nt consequent dt-iterations of self.psi and self.a/self.b"""
+    def __iterate(self, dt, Nt, T):
         
         self._set_iterator_options(iterator_type = 'order_parameter', 
                 dt = dt, Nt = Nt, T = T, mandatory_definition = True)
-        self._set_iterator_options(iterator_type = 'vector_potential', 
-                dt = dt, Nt = Nt, T = T, mandatory_definition = True)
-        
         self.__stability_warnings_order_parameter()
+
         if self.solveA:
+            self._set_iterator_options(iterator_type = 'vector_potential', 
+                    dt = dt, Nt = Nt, T = T, mandatory_definition = True)
             self.__stability_warnings_vector_potential()
         
         self.td_energies = []
 
-        for tau in range(self.Nt):
-            gab_gabi = self.__iterate_order_parameter_gpu_ab_preprocess()
-            self.__iterate_order_parameter_gpu(gab_gabi)
-            self.__iterate_order_parameter_gpu_ab_postprocess(gab_gabi)
+        Utils.copy_dtod(self.vars._psi_outer_h(), self.vars.order_parameter_h())
+        self.vars._psi_outer.need_dtoh_sync()
+
+        Utils.copy_dtod(self.vars._psi_outer_prev_h(), self.vars.order_parameter_h())
+        self.vars._psi_outer_prev.need_dtoh_sync()
+
+        if self.solveA:
+            Utils.copy_dtod(self.vars._ab_outer_h(), self.vars.vector_potential_h())
+            self.vars._ab_outer.need_dtoh_sync()
+
+            Utils.copy_dtod(self.vars._ab_outer_prev_h(), self.vars.vector_potential_h())
+            self.vars._ab_outer_prev.need_dtoh_sync()
+
+        for istep in range(Nt):
+
+            # psi_rhs = psi_prev + Langevin
+            Utils.copy_dtod(self.vars._tmp_node_var_h(), self.vars.order_parameter_h())
+            self.vars._tmp_node_var.need_dtoh_sync()
+
+            # TODO: Increment rand_t if Langevin contribution is added elsewhere
+            # TODO: Langevin term for vector potential should be inside the 
+            #       outer iteration loop. Include it in update_vector_potential_rhs()
+
+            self.__update_order_parameter_rhs()
+
             if self.solveA:
+
+                # ab_rhs = ab_prev + Langevin
+                Utils.copy_dtod(self.vars._tmp_edge_var_h(), self.vars.vector_potential_h())
+                self.vars._tmp_edge_var.need_dtoh_sync()
+
+            for iouter in range(self.__nouter_iterations):
+
+                # Solve system of equations: Order parameter
+                self.__iterate_order_parameter_gpu()
+
+                # Convergence check for order parameter 
+                r_max_norm_psi = self.__outer_iteration_convergence_check_order_parameter()
+
+                # Solve system of equations: vector potential
                 self.__iterate_vector_potential_gpu()
 
-            # if tau%1000 == 0:
-            #     E0 = self.observables.free_energy # TMP
-            #     self.td_energies.append(E0)
-            #     print('%3.d: E = %10.10f' % (tau, E0)) # TMP
+                # Convergence check for vector potential
+                r_max_norm_ab = self.__outer_iteration_convergence_check_vector_potential()
+
+                # Store into prev
+                Utils.copy_dtod(self.vars._psi_outer_prev_h(), self.vars._psi_outer_h())
+                if self.solveA:
+                    Utils.copy_dtod(self.vars._ab_outer_prev_h(), self.vars._ab_outer_h())
+
+                self._nouter_total += 1
+
+                # Has the outer iteration converged yet?
+                if r_max_norm_psi < 1 and r_max_norm_ab < 1:
+                    #print('Both psi and ab outer iteration converged for time step: ', 
+                    #        istep+1, 'in: ', iouter+1, ' iteration(s)', flush=True)
+                    break
+
+            # psi_outer is now psi^{\tau+1} 
+            Utils.copy_dtod(self.vars.order_parameter_h(),  self.vars._psi_outer_h())
+            self.vars._psi.need_dtoh_sync()
+
+            # ab_outer is now ab^{\tau+1} 
+            if self.solveA:
+                Utils.copy_dtod(self.vars.vector_potential_h(), self.vars._ab_outer_h())
+                self.vars._vp.need_dtoh_sync()
+
+            if istep % 1000 == 0:
+                E0 = self.observables.free_energy # TMP
+                self.td_energies.append(E0)
+                print('%3.d: E = %10.10f' % (istep, E0), flush = True) # TMP
 
 
     # solve acts as a wrapper over the iterate methods
-    def _solve(self, dt = None, Nt = None, T = None, eqn = None):
+    def _solve(self, dt, Nt, T, dtA, NtA, TA, eqn = None):
 
         if eqn == "order_parameter":
-            self.__iterate_order_parameter(dt = dt, Nt = Nt, T = T) 
+            self.__iterate_order_parameter(dt, Nt, T) 
         elif eqn == "vector_potential":
-            self.__iterate_vector_potential(dtA = dt, NtA = Nt, TA = T) 
+            self.__iterate_vector_potential(dtA, NtA, TA) 
         else:
-            self.__iterate(dt = dt, Nt = Nt, T = T)
+            self.__iterate(dt, Nt, T) 
 

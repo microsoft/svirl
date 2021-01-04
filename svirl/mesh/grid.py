@@ -14,20 +14,24 @@ class Grid(object):
     vertices/nodes as well as material tiling. 
     """
 
-    def __init__(self):
+    def __init__(self, par):
+        self.par = par
+        self.__set_flags_krnl = self.par.get_function('set_flags')
+        self.__clear_flags_krnl = self.par.get_function('clear_flags')
+
         self._mt = None
+        self.__have_material_tiling = False
+
+        self._flags = GArray(shape = (cfg.Nx, cfg.Ny), dtype = np.int32)
         self.material_tiling = cfg.material_tiling
 
 
     def __del__(self):
-        pass
+        self.__free_mt()
 
 
     def have_material_tiling(self):
-        if self._mt is None:
-            return False
-
-        return True
+        return self.__have_material_tiling
 
 
 #--- grids ---#
@@ -88,15 +92,17 @@ class Grid(object):
         return np.meshgrid(x, y, indexing='ij')
 
 
+    def __free_mt(self):
+        if self._mt is not None:
+            self._mt.free()
+            self._mt = None
+            self.__have_material_tiling = False
+
+
     @property
     def material_tiling(self):
-        """Material tiling: Returns True if material is superconducting in a cell, 
-        else return False
-        """
-        if self._mt is not None:
-            return self._mt.get_h().copy()
-        else:
-            return np.full((cfg.Nxc, cfg.Nyc), True, dtype=np.bool)
+        self._flags.sync()
+        return self._flags.get_h().copy().astype(np.bool)
 
 
     @material_tiling.setter
@@ -108,16 +114,21 @@ class Grid(object):
         else:
             mt = material_tiling
 
+        # create or delete material_tiling
         if mt is not None:
             assert mt.shape == (cfg.Nxc, cfg.Nyc)
 
             self._mt = GArray(like = mt.astype(np.bool))
-            #self.set_order_parameter_to_zero_outside_material()
-            #self._mt.sync()
+            self.__have_material_tiling = True
         else: 
-            if self._mt is not None:
-                self._mt.free()
-                self._mt = None
+            self.__free_mt()
+            self._clear_flags()
+
+        # set link variable computation flags based on material tiling
+        self._set_flags()
+
+        # _flags replaces material tiling; free _mt
+        self.__free_mt()
 
 
     def material_tiling_h(self):
@@ -125,6 +136,10 @@ class Grid(object):
             return self._mt.get_d_obj()
 
         return np.uintp(0)
+
+
+    def _flags_h(self):
+        return self._flags.get_d_obj()
 
 
     def __in_material(self, x, y, prohibited_length=None):
@@ -171,7 +186,6 @@ class Grid(object):
         )))
 
 
-
     def interpolate_ab_array_to_c_array(self, a, b):
         cx = 0.5*(a[:, :-1] + a[:, 1:])
         cy = 0.5*(b[:-1, :] + b[1:, :])
@@ -182,3 +196,28 @@ class Grid(object):
         cx, cy = self.interpolate_ab_array_to_c_array(a, b)
         return np.sqrt(np.square(cx) + np.square(cy))
 
+
+    def _set_flags(self):
+        self.__set_flags_krnl(
+                self.material_tiling_h(), 
+                self._flags_h(),
+
+                grid  = (self.par.grid_size, 1, 1),
+                block = (self.par.block_size, 1, 1), 
+                )
+
+        self._flags.need_dtoh_sync()
+        self._flags.sync()
+
+
+    def _clear_flags(self):
+        self.__clear_flags_krnl(
+                self.material_tiling_h(), 
+                self._flags_h(),
+
+                grid  = (self.par.grid_size, 1, 1),
+                block = (self.par.block_size, 1, 1), 
+                )
+
+        self._flags.need_dtoh_sync()
+        self._flags.sync()

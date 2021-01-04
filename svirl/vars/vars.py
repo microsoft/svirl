@@ -31,7 +31,7 @@ class Vars(object):
         self._tmp_psi_real = None
         self._tmp_A_real = None
 
-        # copied from variables/parameters.py
+        # copied from vars/params.py
         self.solveA = np.bool(not np.isposinf(cfg.gl_parameter))
 
         if cfg.order_parameter == 'random': 
@@ -44,6 +44,18 @@ class Vars(object):
         # we don't plan on supporting setter for it
         shapes = [(cfg.Nxa, cfg.Nya), (cfg.Nxb, cfg.Nyb)]
         self._vp = GArray(shape = shapes, dtype = cfg.dtype)
+
+        # Alloc an array for psi to do the nonlinear iteration 
+        self._psi_outer = GArray(like = self._psi, on = GArray.on_device)
+
+        # Alloc an array for psi to do the nonlinear iteration 
+        self._psi_outer_prev = GArray(like = self._psi, on = GArray.on_device)
+
+        # vector potential for outer iteration 
+        self._ab_outer = GArray(shape = shapes, dtype = cfg.dtype)
+
+        # vector potential for outer iteration 
+        self._ab_outer_prev = GArray(shape = shapes, dtype = cfg.dtype)
 
 
     def __del__(self):
@@ -132,6 +144,49 @@ class Vars(object):
             return self._vp.get_d_obj()
 
         return np.uintp(0)
+
+
+    def _psi_outer_h(self):
+        if self._psi_outer is not None:
+            return self._psi_outer.get_d_obj()
+
+        return np.uintp(0)
+
+
+    def _psi_outer_prev_h(self):
+        if self._psi_outer_prev is not None:
+            return self._psi_outer_prev.get_d_obj()
+
+        return np.uintp(0)
+
+
+    def _psi_prev_h(self):
+        if self._psi_prev is not None:
+            return self._psi_prev.get_d_obj()
+
+        return np.uintp(0)
+
+
+    def _ab_outer_h(self):
+        if self._ab_outer is not None:
+            return self._ab_outer.get_d_obj()
+
+        return np.uintp(0)
+
+
+    def _ab_outer_prev_h(self):
+        if self._ab_outer_prev is not None:
+            return self._ab_outer_prev.get_d_obj()
+
+        return np.uintp(0)
+
+
+    def _ab_prev_h(self):
+        if self._ab_prev is not None:
+            return self._ab_prev.get_d_obj()
+
+        return np.uintp(0)
+
 
     #--------------------------
     # temporary arrays
