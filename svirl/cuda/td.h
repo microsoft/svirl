@@ -528,9 +528,6 @@ void iterate_vector_potential_y_jacobi_step(
 
         n = Na + i + Nxb*j;
 
-        if (n == 80448)
-            printf("From Y jacobi; n = %%d\n", n);
-
         // Contribution of current grid point
         diag = 1.0 + 2.0 * beta * dt_rho_kappa2_idx2;
 
@@ -547,9 +544,6 @@ void iterate_vector_potential_y_jacobi_step(
 
         // Solve
         ab_next[n] = (ab_rhs[n] + off_diag_im + off_diag_ip)/diag;
-
-        if (n == 80448)
-            printf("From Y jacobi; (ab_next, ab) = (%%g, %%g)\n", ab_next[n], ab[n]);
 
         // residual of Jacobi step
         r_n = abs(ab_next[n] - ab[n]); 
